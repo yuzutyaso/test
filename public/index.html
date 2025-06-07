@@ -141,7 +141,7 @@
                 return;
             }
 
-            statusDiv.textContent = '動画を処理中... (時間がかかります)';
+            statusDiv.textContent = '動画を処理中... (Vercelの無料プランの場合、時間がかかるかタイムアウトする可能性があります)';
             processButton.disabled = true;
             videoPlayer.src = ''; // 以前の動画をクリア
             videoPlayer.load();
@@ -150,7 +150,8 @@
 
 
             try {
-                const response = await fetch('http://localhost:3000/process-video', { // サーバーのURLに合わせる
+                // Vercel Serverless Functionのエンドポイントを呼び出す
+                const response = await fetch('/api/process-video', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -164,7 +165,12 @@
                 }
 
                 const data = await response.json();
-                const manifestUrl = `http://localhost:3000${data.manifestUrl}`; // フルURLを構築
+                // Vercelでの動画ファイル配信は複雑。
+                // ここで返される manifestUrl は、実際にはVercel Blob Storageなどにアップロードされた
+                // 公開URLであるべきです。
+                // この例では、Functionが一時的に生成したファイルを指すURLとなるため、
+                // 実際には再生できない可能性が高いです。
+                const manifestUrl = `${window.location.origin}${data.manifestUrl}`;
                 statusDiv.textContent = `動画処理完了！再生準備中...`;
                 console.log('Manifest URL:', manifestUrl);
 
@@ -225,4 +231,4 @@
         }
     </script>
 </body>
-  </html>
+</html>
