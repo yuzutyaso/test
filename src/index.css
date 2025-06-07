@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* カスタムスタイルやフォント設定など、必要に応じて追加 */
+body {
+  font-family: 'Roboto', sans-serif; /* YouTubeに似たフォント */
+  @apply bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100; /* ライト/ダークモードの基本色 */
+}
+
+/* ヘッダーの固定 */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
