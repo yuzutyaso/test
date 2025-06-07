@@ -1,7 +1,0 @@
-/* src/app/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* 必要であれば、ここにカスタムCSSを追加できますが、
-   今回の埋め込みスタイルはコンポーネント内でTailwindクラスとして直接記述しています */
