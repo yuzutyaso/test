@@ -1,0 +1,17 @@
+{
+  "name": "youtube-streamer-vercel",
+  "version": "1.0.0",
+  "description": "YouTube video streaming with quality adjustment on Vercel (PoC).",
+  "main": "api/process-video.js",
+  "scripts": {
+    "start": "vercel dev",
+    "deploy": "vercel"
+  },
+  "dependencies": {
+    // Vercel Serverless Functionではexpressを直接使わないため、依存関係は空
+    // Vercel Blob Storageを利用する場合はここに `@vercel/blob` を追加
+  },
+  "devDependencies": {
+    "vercel": "^30.2.2"
+  }
+}
