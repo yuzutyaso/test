@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube to WEBM Converter</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #0056b3; margin-bottom: 30px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        input[type="text"], select { width: calc(100% - 20px); padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
+        button { background-color: #007bff; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 18px; width: 100%; transition: background-color 0.3s ease; }
+        button:hover { background-color: #0056b3; }
+        .result-area { margin-top: 30px; padding: 15px; border: 1px dashed #ccc; border-radius: 5px; background-color: #e9e9e9; text-align: center; min-height: 50px; display: flex; align-items: center; justify-content: center; }
+        .result-area a { color: #007bff; text-decoration: none; font-weight: bold; }
+        .result-area a:hover { text-decoration: underline; }
+        .error { color: #dc3545; font-weight: bold; text-align: center; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>YouTube動画 WEBM変換</h1>
+
+        <label for="youtubeUrl">YouTube 動画URL:</label>
+        <input type="text" id="youtubeUrl" placeholder="例: https://www.youtube.com/watch?v=xxxxxxxx">
+
+        <label for="qualitySelect">画質設定:</label>
+        <select id="qualitySelect">
+            <option value="default">デフォルト (元の品質に近い)</option>
+            <option value="high">高画質 (1080p, 高ビットレート)</option>
+            <option value="medium">中画質 (720p, 中ビットレート)</option>
+            <option value="low">低画質 (480p, 低ビットレート)</option>
+        </select>
+
+        <button onclick="convertVideo()">WEBMに変換</button>
+
+        <div class="result-area" id="resultArea">
+            変換結果がここに表示されます。
+        </div>
+        <div class="error" id="errorArea"></div>
+    </div>
+
+    <script>
+        async function convertVideo() {
+            const urlInput = document.getElementById('youtubeUrl');
+            const qualitySelect = document.getElementById('qualitySelect');
+            const resultArea = document.getElementById('resultArea');
+            const errorArea = document.getElementById('errorArea');
+
+            resultArea.innerHTML = '変換中... しばらくお待ちください。';
+            errorArea.innerHTML = ''; // エラーメッセージをクリア
+
+            const youtubeUrl = urlInput.value;
+            const selectedQuality = qualitySelect.value;
+
+            if (!youtubeUrl) {
+                errorArea.innerHTML = 'YouTubeのURLを入力してください。';
+                resultArea.innerHTML = '変換結果がここに表示されます。';
+                return;
+            }
+
+            let qualitySettings = {};
+            switch (selectedQuality) {
+                case 'high':
+                    qualitySettings = { resolution: '1920x1080', bitrate: '2M', crf: 25, framerate: 30 }; // 例
+                    break;
+                case 'medium':
+                    qualitySettings = { resolution: '1280x720', bitrate: '1M', crf: 30, framerate: 25 }; // 例
+                    break;
+                case 'low':
+                    qualitySettings = { resolution: '854x480', bitrate: '500K', crf: 35, framerate: 24 }; // 例
+                    break;
+                case 'default':
+                default:
+                    // デフォルトは画質調整パラメータを送信しない
+                    break;
+            }
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/convert', { // FlaskバックエンドのURL
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: youtubeUrl, quality: qualitySettings }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.download_url) {
+                        const downloadLink = `<a href="http://127.0.0.1:5000${data.download_url}" target="_blank" download>ダウンロードはこちら</a>`;
+                        resultArea.innerHTML = downloadLink;
+                    } else {
+                        resultArea.innerHTML = '変換は成功しましたが、ダウンロードURLがありません。';
+                    }
+                } else {
+                    errorArea.innerHTML = `エラー: ${data.error || '不明なエラーが発生しました。'}`;
+                    resultArea.innerHTML = '変換結果がここに表示されます。';
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                errorArea.innerHTML = `通信エラーが発生しました: ${error.message}`;
+                resultArea.innerHTML = '変換結果がここに表示されます。';
+            }
+        }
+    </script>
+</body>
+</html>
