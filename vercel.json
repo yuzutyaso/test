@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "build": {
+    "env": {
+      "FFMPEG_BINARY_URL": "https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4.1/ffmpeg-linux-x64",
+      "YTDLP_BINARY_URL": "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+    }
+  },
+  "buildCommand": "bash install-dependencies.sh && npm install",
+  "routes": [
+    {
+      "src": "/api/process-video",
+      "dest": "/api/process-video.js",
+      "methods": ["POST"]
+    },
+    {
+      "src": "/api/media/(.*)",
+      "dest": "/api/process-video.js",
+      "methods": ["GET"]
+      // **重要**: 上記のdestは、`/api/process-video.js` にすべての`/api/media`リクエストをルーティングします。
+      // `/api/process-video.js` 内で、これらのGETリクエストを処理し、Vercel Blob Storageからファイルを返す必要があります。
+      // しかし、現在の`api/process-video.js`はGETリクエストを処理しません。
+      // 実際の運用では、Vercel Blob Storageなどの永続ストレージからの直接配信URLを使うべきです。
+      // この設定はあくまで Serverless Functionで一時的に生成したファイルを「試行」するためのものです。
+      // (このパスでファイルが提供されることはありません)
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ]
+}
