@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube埋め込みストリーミング</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: calc(100% - 110px);
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #e0e0e0;
+            color: #333;
+            min-height: 40px;
+            text-align: center;
+        }
+        #videoPlayer {
+            width: 100%;
+            height: auto;
+            max-height: 500px; /* 必要に応じて調整 */
+            background-color: black;
+            margin-top: 30px;
+            border-radius: 8px;
+        }
+        .player-controls {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .player-controls label {
+            font-weight: bold;
+        }
+        select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>YouTube動画埋め込みプレイヤー</h1>
+        <p>YouTube URLを入力し、動画をストリーミング再生できるDASH形式に変換します。</p>
+        <div>
+            <input type="text" id="youtubeUrl" placeholder="YouTube URLをここに入力...">
+            <button id="processButton">動画を処理</button>
+        </div>
+        <div id="status">ここに処理ステータスが表示されます...</div>
+
+        <video id="videoPlayer" controls autoplay></video>
+        <div class="player-controls">
+            <label for="qualitySelect">画質選択:</label>
+            <select id="qualitySelect" disabled>
+                <option value="" disabled selected>読み込み中...</option>
+            </select>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dashjs/4.5.0/dash.all.min.js"></script>
+    <script>
+        const youtubeUrlInput = document.getElementById('youtubeUrl');
+        const processButton = document.getElementById('processButton');
+        const statusDiv = document.getElementById('status');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const qualitySelect = document.getElementById('qualitySelect');
+
+        let player; // DASH.jsプレイヤーインスタンス
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // DASH.jsプレイヤーを初期化
+            player = dashjs.MediaPlayer().create();
+            player.attachView(videoPlayer);
+            player.setAutoplay(true); // 自動再生を有効に
+
+            // 画質が変更されたときにselectボックスを更新
+            player.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, function(e) {
+                if (e.mediaType === 'video') {
+                    qualitySelect.value = e.newQuality;
+                }
+            });
+
+            // DASHマニフェストがロードされたときに画質選択肢を更新
+            player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() {
+                updateQualityOptions();
+            });
+
+            // プレイヤーのエラーハンドリング
+            player.on(dashjs.MediaPlayer.events.ERROR, function(e) {
+                console.error("DASH.js Error:", e);
+                statusDiv.textContent = `再生エラー: ${e.message}`;
+            });
+        });
+
+        // サーバーに動画処理をリクエスト
+        processButton.addEventListener('click', async () => {
+            const url = youtubeUrlInput.value.trim();
+            if (!url) {
+                statusDiv.textContent = 'YouTube URLを入力してください。';
+                return;
+            }
+
+            statusDiv.textContent = '動画を処理中... (時間がかかります)';
+            processButton.disabled = true;
+            videoPlayer.src = ''; // 以前の動画をクリア
+            videoPlayer.load();
+            qualitySelect.disabled = true;
+            qualitySelect.innerHTML = '<option value="" disabled selected>読み込み中...</option>';
+
+
+            try {
+                const response = await fetch('http://localhost:3000/process-video', { // サーバーのURLに合わせる
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '動画処理に失敗しました。');
+                }
+
+                const data = await response.json();
+                const manifestUrl = `http://localhost:3000${data.manifestUrl}`; // フルURLを構築
+                statusDiv.textContent = `動画処理完了！再生準備中...`;
+                console.log('Manifest URL:', manifestUrl);
+
+                // DASH.jsプレイヤーにマニフェストURLをセットし、再生を開始
+                player.attachSource(manifestUrl);
+                // 再生が開始されたら、画質選択を有効化
+                qualitySelect.disabled = false;
+                updateQualityOptions(); // 念のためここで一度更新
+            } catch (error) {
+                statusDiv.textContent = `エラー: ${error.message}`;
+                console.error('処理エラー:', error);
+            } finally {
+                processButton.disabled = false;
+            }
+        });
+
+        // 画質選択肢を更新する関数
+        function updateQualityOptions() {
+            const videoQualities = player.get
+            QualityFor('video'); // 利用可能な動画品質を取得
+            const currentQualityIndex = player.get
+            CurrentQualityFor('video'); // 現在の品質インデックスを取得
+
+            qualitySelect.innerHTML = ''; // ドロップダウンをクリア
+
+            if (videoQualities && videoQualities.length > 0) {
+                // オート選択肢を追加
+                const autoOption = document.createElement('option');
+                autoOption.value = 'auto';
+                autoOption.textContent = '自動';
+                qualitySelect.appendChild(autoOption);
+
+                // 各画質オプションを追加
+                videoQualities.forEach((quality, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${quality.height}p (${(quality.bitrate / 1000).toFixed(0)}kbps)`;
+                    if (index === currentQualityIndex) {
+                        option.selected = true; // 現在の品質を選択済みに
+                    }
+                    qualitySelect.appendChild(option);
+                });
+
+                // ドロップダウンの変更イベントリスナー
+                qualitySelect.onchange = (event) => {
+                    if (event.target.value === 'auto') {
+                        player.setAutoSwitchQualityFor('video', true); // 自動切り替えを有効に
+                    } else {
+                        player.setQualityFor('video', parseInt(event.target.value)); // 手動で品質を設定
+                        player.setAutoSwitchQualityFor('video', false); // 自動切り替えを無効に
+                    }
+                };
+                qualitySelect.disabled = false; // 画質選択を有効化
+            } else {
+                qualitySelect.innerHTML = '<option value="" disabled selected>画質なし</option>';
+                qualitySelect.disabled = true;
+            }
+        }
+    </script>
+</body>
+  </html>
