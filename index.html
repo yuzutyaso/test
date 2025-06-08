@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invidious動画ビューア</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1, h2, h3 {
+            color: #0056b3;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            align-items: center;
+        }
+
+        .input-section input[type="text"] {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .input-section button {
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .input-section button:hover {
+            background-color: #0056b3;
+        }
+
+        .video-player-wrapper {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            height: 0;
+            margin-bottom: 20px;
+            background-color: #000; /* iframeがロードされるまでの背景色 */
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .video-player-wrapper iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .video-details p {
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .comments-section, .related-videos-section {
+            margin-top: 40px;
+        }
+
+        .comment-item {
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .comment-author {
+            font-weight: bold;
+            color: #0056b3;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .comment-content {
+            margin-bottom: 5px;
+        }
+
+        .comment-info {
+            font-size: 0.9em;
+            color: #777;
+        }
+
+        .related-video-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 15px;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            border-radius: 5px;
+        }
+
+        .related-video-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .related-video-item img {
+            width: 120px;
+            height: 67.5px; /* 16:9アスペクト比 */
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .related-video-details {
+            flex-grow: 1;
+        }
+
+        .related-video-details h4 {
+            margin: 0;
+            font-size: 1.1em;
+            color: #333;
+            line-height: 1.4;
+        }
+
+        .related-video-details p {
+            margin: 5px 0 0;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        #error-message {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Invidious動画ビューア</h1>
+
+        <div class="input-section">
+            <input type="text" id="videoIdInput" placeholder="YouTube動画IDまたはURLを入力">
+            <button id="loadVideoButton">動画を読み込む</button>
+        </div>
+        <div id="error-message"></div>
+
+        <div id="video-player-area">
+            <div class="video-player-wrapper" id="video-player">
+                </div>
+            <div class="video-details" id="video-details">
+                </div>
+        </div>
+
+        <div class="comments-section" id="comments-section">
+            <h2>コメント</h2>
+            </div>
+
+        <div class="related-videos-section" id="related-videos-section">
+            <h2>関連動画</h2>
+            </div>
+    </div>
+
+    <script>
+        // 利用可能なInvidiousインスタンスのリスト（適宜更新）
+        // 安定性を考慮し、複数のインスタンスを用意すると良いでしょう。
+        const invidiousInstances = [
+            'https://invidious.snopyta.org',
+            'https://vid.puffyan.us',
+            'https://invidious.namazso.eu',
+            // 他のインスタンスを追加
+        ];
+
+        let currentInvidiousInstanceIndex = 0; // 現在使用するインスタンスのインデックス
+
+        // 動画IDを抽出するヘルパー関数
+        function extractVideoId(input) {
+            // YouTube URLからIDを抽出
+            const youtubeUrlRegex = /(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=|embed\/|v\/|)([\w-]{11})(?:\S+)?/i;
+            const match = input.match(youtubeUrlRegex);
+            if (match && match[1]) {
+                return match[1];
+            }
+            // 既に動画IDの場合
+            if (input.length === 11 && /[\w-]{11}/.test(input)) {
+                return input;
+            }
+            return null;
+        }
+
+        // Invidious APIからデータを取得する関数
+        async function fetchInvidiousData(endpoint) {
+            const instance = invidiousInstances[currentInvidiousInstanceIndex];
+            const url = `${instance}/api/v1/${endpoint}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error(`Failed to fetch from ${instance}:`, error);
+                // 現在のインスタンスで失敗したら、次のインスタンスを試す
+                currentInvidiousInstanceIndex = (currentInvidiousInstanceIndex + 1) % invidiousInstances.length;
+                console.log(`Trying next Invidious instance: ${invidiousInstances[currentInvidiousInstanceIndex]}`);
+                throw error; // エラーを再スローして呼び出し元で処理
+            }
+        }
+
+        // 動画を読み込み、表示するメイン関数
+        async function loadVideo(videoId) {
+            const videoPlayer = document.getElementById('video-player');
+            const videoDetailsDiv = document.getElementById('video-details');
+            const commentsSection = document.getElementById('comments-section');
+            const relatedVideosSection = document.getElementById('related-videos-section');
+            const errorMessage = document.getElementById('error-message');
+
+            // 以前のコンテンツをクリア
+            videoPlayer.innerHTML = '';
+            videoDetailsDiv.innerHTML = '';
+            commentsSection.innerHTML = '<h2>コメント</h2>';
+            relatedVideosSection.innerHTML = '<h2>関連動画</h2>';
+            errorMessage.textContent = '';
+
+            if (!videoId) {
+                errorMessage.textContent = '有効なYouTube動画IDまたはURLを入力してください。';
+                return;
+            }
+
+            // 動画埋め込み
+            videoPlayer.innerHTML = `
+                <iframe
+                    src="https://www.youtube-nocookie.com/embed/${videoId}"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen
+                ></iframe>
+            `;
+
+            let videoData = null;
+            let commentsData = null;
+            let attempts = 0;
+            const maxAttempts = invidiousInstances.length;
+
+            while (attempts < maxAttempts) {
+                try {
+                    // 動画情報、コメント、関連動画を並行して取得
+                    [videoData, commentsData] = await Promise.all([
+                        fetchInvidiousData(`videos/${videoId}`),
+                        fetchInvidiousData(`comments/${videoId}`)
+                    ]);
+                    break; // 成功したらループを抜ける
+                } catch (error) {
+                    console.error(`Attempt ${attempts + 1} failed to load video data:`, error);
+                    errorMessage.textContent = `データの取得に失敗しました。別のInvidiousインスタンスを試しています... (${attempts + 1}/${maxAttempts})`;
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        errorMessage.textContent = 'すべてのInvidiousインスタンスでデータの取得に失敗しました。後でもう一度お試しください。';
+                        return;
+                    }
+                }
+            }
+
+
+            if (!videoData) {
+                errorMessage.textContent = '動画情報を取得できませんでした。';
+                return;
+            }
+
+            // 動画詳細の表示
+            videoDetailsDiv.innerHTML = `
+                <h2>${videoData.title}</h2>
+                <p><strong>チャンネル:</strong> ${videoData.author}</p>
+                <p><strong>再生回数:</strong> ${videoData.viewCount.toLocaleString()}回</p>
+                <p><strong>公開日:</strong> ${new Date(videoData.published * 1000).toLocaleDateString()}</p>
+                <h3>概要:</h3>
+                <p>${videoData.description ? videoData.description.replace(/\n/g, '<br>') : '概要はありません。'}</p>
+            `;
+
+            // コメントの表示
+            if (commentsData && commentsData.comments && commentsData.comments.length > 0) {
+                commentsData.comments.forEach(comment => {
+                    commentsSection.innerHTML += `
+                        <div class="comment-item">
+                            <span class="comment-author">${comment.author}</span>
+                            <p class="comment-content">${comment.content}</p>
+                            <span class="comment-info">${comment.publishedText} - いいね: ${comment.likeCount}</span>
+                        </div>
+                    `;
+                });
+            } else {
+                commentsSection.innerHTML += '<p>コメントはありません。</p>';
+            }
+
+            // 関連動画の表示
+            if (videoData.relatedVideos && videoData.relatedVideos.length > 0) {
+                videoData.relatedVideos.forEach(relatedVideo => {
+                    // サムネイルが利用可能か確認
+                    const thumbnailUrl = relatedVideo.videoThumbnails && relatedVideo.videoThumbnails.length > 0
+                                         ? relatedVideo.videoThumbnails[0].url
+                                         : 'https://via.placeholder.com/120x67.5?text=No+Image'; // 代替画像
+
+                    relatedVideosSection.innerHTML += `
+                        <div class="related-video-item" onclick="loadVideo('${relatedVideo.videoId}')">
+                            <img src="${thumbnailUrl}" alt="${relatedVideo.title}">
+                            <div class="related-video-details">
+                                <h4>${relatedVideo.title}</h4>
+                                <p>${relatedVideo.author} - ${relatedVideo.viewCount.toLocaleString()}回再生</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                relatedVideosSection.innerHTML += '<p>関連動画はありません。</p>';
+            }
+        }
+
+        // イベントリスナー
+        document.getElementById('loadVideoButton').addEventListener('click', () => {
+            const input = document.getElementById('videoIdInput').value.trim();
+            const videoId = extractVideoId(input);
+            loadVideo(videoId);
+        });
+
+        // Enterキーでも動画を読み込む
+        document.getElementById('videoIdInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('loadVideoButton').click();
+            }
+        });
+
+        // 初期ロード時に表示する動画がある場合（オプション）
+        // 例: URLパラメータから動画IDを取得して自動ロード
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialVideoId = urlParams.get('v');
+        if (initialVideoId) {
+        loadVideo(initialVideoId);
+            document.getElementById('videoIdInput').value = initialVideoId;
+        } else {
+        //     // デフォルトの動画を表示する場合
+        //     loadVideo('dQw4w9WgXcQ'); // Rick Astley - Never Gonna Give You Up
+        //     document.getElementById('videoIdInput').value = 'dQw4w9WgXcQ';
+        // }
+    </script>
+</body>
+</html>
