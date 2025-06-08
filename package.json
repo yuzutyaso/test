@@ -1,0 +1,19 @@
+{
+  "name": "github-bulletin-board-direct",
+  "version": "1.0.0",
+  "description": "A bulletin board server using GitHub Issues with direct credentials.",
+  "main": "api/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "node api/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@octokit/rest": "^20.0.2",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
